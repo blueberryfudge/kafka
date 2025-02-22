@@ -2,43 +2,34 @@ package main
 
 import (
 	"log"
+	produce_message "producer-basic/produce_messsage"
+
+	kkafka "producer-basic/infrastructure/kafka"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 func main() {
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{
+	config := &kafka.ConfigMap{
 		"bootstrap.servers": "localhost:9092,localhost:9093,localhost:9094",
 		"acks":              "1",
 		"retries":           3,
-	})
-	if err != nil {
-		log.Fatalf("Failed to create producer: %s", err)
 	}
+	producer, err := kkafka.NewKafkaProducer(config)
+	if err != nil {
+		log.Fatalf("Failed to create kafka producer: %s", err)
+	}
+
 	defer producer.Close()
 
-	topic := "sample-topic"
+	ProduceMessage := produce_message.ProduceMessage{Producer: producer}
 
+	topic := "sample-topic"
 	message := "This is a sample message"
 
-	err = producer.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-		Value:          []byte(message),
-	}, nil)
-
-	if err != nil {
-		log.Fatalf("Failed to produce a message: %s", err)
+	if err := ProduceMessage.Produce(topic, message); err != nil {
+		log.Fatalf("Failed to produce message: %s", err)
 	} else {
-		log.Printf("Messge produced: %s", message)
+		log.Printf("Message produced: %s", message)
 	}
-
-	event := <-producer.Events()
-	m, ok := event.(*kafka.Message)
-
-	if ok && m.TopicPartition.Error == nil {
-		log.Printf("Message delivered to partition %d at offset %v", m.TopicPartition.Partition, m.TopicPartition.Offset)
-	} else {
-		log.Printf("Failed to deliver message: %v", m.TopicPartition.Error)
-	}
-	producer.Flush(15 * 1000)
 }
